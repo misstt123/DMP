@@ -80,6 +80,6 @@ object BusinessAreaRunner {
   }
 
   private val ODS_TABLE_NAME = ETLRunner.ODS_TABLE_NAME
-  private val AREA_TABLE_NAME = "BUSINESS_AREA"
+   val AREA_TABLE_NAME = "BUSINESS_AREA"
 
 }
