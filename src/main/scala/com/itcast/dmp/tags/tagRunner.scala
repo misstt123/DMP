@@ -4,7 +4,8 @@ import ch.hsr.geohash.GeoHash
 import cn.itcast.etl.ETLRunner
 import com.itcast.dmp.area.BusinessAreaRunner
 import org.apache.commons.lang3.StringUtils
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.graphframes.GraphFrame
 
 import scala.collection.mutable
 
@@ -41,13 +42,52 @@ object tagRunner {
       odsWithGeoHash.col("geoHash") === area.col("geoHash"),
       "left"
     )
-    val tags = odsWithArea.map(createTags(_))
+    //生成标签数据
+    val idsAndTags: Dataset[IdsWithTags] = odsWithArea.map(createTags(_))
+    //图计算
+    val vertx = idsAndTags.map(item => Vertx(item.mainId, item.ids, item.tags))
+    //定要注意边的生成, 是一对多的, 是一个笛卡尔积
+    val edge = idsAndTags.flatMap(item => {
+      val ids = item.ids
+      val result = for (id <- ids; otherId <- ids if id != otherId) yield Edge(id._2, otherId._2)
+      result
+    })
 
+    val component: Dataset[VertxComponent] = GraphFrame(vertx.toDF(), edge.toDF()).connectedComponents.run().as[VertxComponent]
 
-
-
+    //聚合
+    val agg: Dataset[(String, VertxComponent)] = component.groupByKey(component => component.component)
+      .reduceGroups(reduceVertex _)
+    //转换
+    val result = agg.map(mapTags _)
+result.show()
   }
 
+  def mapTags(vertexComponent: (String, VertxComponent)) = {
+    val mainId = getMainId(vertexComponent._2.ids)
+
+    // tag1:1,tag2:1,tag3:1
+    val tags = vertexComponent._2.tags
+      .map(item => item._1 + ":" + item._2)
+      .mkString(",")
+
+    Tags(mainId, tags)
+  }
+
+  def reduceVertex(curr: VertxComponent, mid: VertxComponent) = {
+    val id = curr.id
+    val ids = curr.ids
+    val temp = curr.tags.map {
+      case (key, value) => if (mid.tags.contains(key)) {
+        (key, value + mid.tags(key))
+      } else {
+        (key, value)
+      }
+    }
+    val tags = mid.tags ++ tags
+
+    VertxComponent(id, ids, tags, curr.component)
+  }
 
   def createTags(row: Row): IdsWithTags = {
     // 3.4 生成标签数据
@@ -79,7 +119,6 @@ object tagRunner {
     IdsWithTags(mainId, ids, tags.toMap)
   }
 
-
   def getIdMaps(row: Row): Map[String, String] = {
     val keyList = List("imei", "imeimd5", "imeisha1", "mac", "macmd5", "macsha1", "openudid",
       "openudidmd5", "openudidsha1", "idfa", "idfamd5", "idfasha1")
@@ -110,3 +149,11 @@ object tagRunner {
 }
 
 case class IdsWithTags(mainId: String, ids: Map[String, String], tags: Map[String, Int])
+
+case class Vertx(id: String, ids: Map[String, String], tags: Map[String, Int])
+
+case class Edge(src: String, dst: String)
+
+case class VertxComponent(id: String, ids: Map[String, String], tags: Map[String, Int], component: String)
+
+case class Tags(mainId: String, tags: String)

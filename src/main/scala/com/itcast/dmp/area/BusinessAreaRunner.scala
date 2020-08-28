@@ -3,7 +3,6 @@ package com.itcast.dmp.area
 import ch.hsr.geohash.GeoHash
 import cn.itcast.etl.ETLRunner
 import com.itcast.dmp.utils.HttpUtils
-import com.sun.xml.internal.ws.api.config.management.policy.ManagedServiceAssertion.ImplementationRecord
 import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder
 import org.apache.kudu.{Schema, Type}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -58,9 +57,9 @@ object BusinessAreaRunner {
   private val keys = List("geoHash")
   private val schema = new Schema(
     List(
-      new ColumnSchemaBuilder("geoHash", Type.STRING).nullable(false).key(true),
-      new ColumnSchemaBuilder("area", Type.STRING).nullable(true).key(true))
-  ).asjava
+      new ColumnSchemaBuilder("geoHash", Type.STRING).nullable(false).key(true).build(),
+      new ColumnSchemaBuilder("area", Type.STRING).nullable(true).key(true).build()).asJava
+  )
 
 
   def fetchArea(longitude: Double, latitude: Double) = {
@@ -80,6 +79,6 @@ object BusinessAreaRunner {
   }
 
   private val ODS_TABLE_NAME = ETLRunner.ODS_TABLE_NAME
-   val AREA_TABLE_NAME = "BUSINESS_AREA"
+  val AREA_TABLE_NAME = "BUSINESS_AREA"
 
 }
