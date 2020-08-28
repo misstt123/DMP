@@ -3,6 +3,7 @@ package com.itcast.dmp.tags
 import ch.hsr.geohash.GeoHash
 import cn.itcast.etl.ETLRunner
 import com.itcast.dmp.area.BusinessAreaRunner
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import scala.collection.mutable
@@ -33,7 +34,6 @@ object tagRunner {
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-
     val geoHash = udf(toGeoHash _)
     val odsWithGeoHash = ods.withColumn("geoHash", geoHash('longitude, 'latitude))
     val odsWithArea: DataFrame = odsWithGeoHash.join(
@@ -41,11 +41,15 @@ object tagRunner {
       odsWithGeoHash.col("geoHash") === area.col("geoHash"),
       "left"
     )
-    odsWithArea.map(createTags)
+    val tags = odsWithArea.map(createTags(_))
+
+
+
 
   }
 
-  def createTags(row: Row):IdsWithTags = {
+
+  def createTags(row: Row): IdsWithTags = {
     // 3.4 生成标签数据
     val tags = mutable.Map[String, Int]()
     // 3.4.1 广告标识
@@ -68,6 +72,32 @@ object tagRunner {
     row.getAs[String]("area").split(",")
       .map("A" + _ -> 1)
       .foreach(tags += _)
+
+    val ids = getIdMaps(row)
+    val mainId = getMainId(ids)
+
+    IdsWithTags(mainId, ids, tags.toMap)
+  }
+
+
+  def getIdMaps(row: Row): Map[String, String] = {
+    val keyList = List("imei", "imeimd5", "imeisha1", "mac", "macmd5", "macsha1", "openudid",
+      "openudidmd5", "openudidsha1", "idfa", "idfamd5", "idfasha1")
+
+    keyList.map(key => (key, row.getAs[String](key)))
+      .filter(item => StringUtils.isNoneBlank(item._2))
+      .toMap
+  }
+
+  def getMainId(ids: Map[String, String]) = {
+
+    val keyList = List("imei", "imeimd5", "imeisha1", "mac", "macmd5", "macsha1", "openudid",
+      "openudidmd5", "openudidsha1", "idfa", "idfamd5", "idfasha1")
+
+    keyList.map(key => ids.get(key))
+      .filter(Option => Option.isDefined)
+      .map(_.get)
+      .head
   }
 
   def toGeoHash(longitude: Double, latitude: Double) = {
@@ -78,4 +108,5 @@ object tagRunner {
   private val AREA_TABLE = BusinessAreaRunner.AREA_TABLE_NAME
 
 }
+
 case class IdsWithTags(mainId: String, ids: Map[String, String], tags: Map[String, Int])
