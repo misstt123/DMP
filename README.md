@@ -13,9 +13,9 @@ DSP 最重要的特性是, 能够帮助广告主筛选客户, 换句话说, DSP 
 - 标签合并 & 衰减
 - 历史合并
 ####  架构
-![架构](./jiagou.png)
+![架构](https://github.com/misstt123/DMP/blob/master/jiagou.png)
 #### 主要任务
-![task](./1554645748023.png)
+![task](https://github.com/misstt123/DMP/blob/master/1554645748023.png)
 
 #### 图计算结果
-![](./jieguo.png)
+![](https://github.com/misstt123/DMP/blob/master/jieguo.png)
